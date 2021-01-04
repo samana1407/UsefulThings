@@ -6,7 +6,7 @@ namespace Samana.Algorithms
     public static class Combinations
     {
 
-        // Возварщает список коллекций со всеми возможными варинатами перестановки в source
+        // Возвращает список коллекций со всеми возможными вариантами перестановок в source
         public static List<T[]> AllCombinations<T>(T[] source)
         {
             List<T[]> resultList = new List<T[]>();
