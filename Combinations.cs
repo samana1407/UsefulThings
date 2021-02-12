@@ -10,11 +10,11 @@ namespace Samana.Algorithms
         public static List<T[]> AllCombinations<T>(T[] source)
         {
             List<T[]> resultList = new List<T[]>();
-            foo(source, resultList);
+            fooRecursion(source, resultList);
             return resultList;
 
 
-            void foo(T[] originalSource, List<T[]> result, List<int> currentSet = null)
+            void fooRecursion(T[] originalSource, List<T[]> result, List<int> currentSet = null)
             {
                 if (currentSet == null) currentSet = new List<int>();
 
@@ -35,7 +35,7 @@ namespace Samana.Algorithms
                             return;
                         }
                         else
-                            foo(originalSource, result, cloneSet);
+                            fooRecursion(originalSource, result, cloneSet);
                     }
                     else continue;
                 }
