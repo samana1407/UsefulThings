@@ -23,7 +23,7 @@ namespace Samana.Generators
             _map.Clear();
         }
 
-        public void AddRoom(int minBlocks = 1, int maxBlocks = 1)
+        public void AddRoom(int minBlocks = 1, int maxBlocks = 1, SideState sideState = SideState.Door)
         {
             if (minBlocks < 1 || maxBlocks < 1)
             {
@@ -59,23 +59,23 @@ namespace Samana.Generators
                 if (!succes) continue;
 
                 // если дошли сюда, значит комната вместилась и нужно сделать двери в первом блоке и начальной стене
-                connectedSide.State = SideState.Door;
-                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = SideState.Door;
+                connectedSide.State = sideState;
+                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = sideState;
                 return;
             }
         }
 
-        public void AddRooms(int roomsAmount = 1, int minBlocks = 1, int maxBlocks = 1)
+        public void AddRooms(int roomsAmount = 1, int minBlocks = 1, int maxBlocks = 1, SideState sideState = SideState.Door)
         {
             if (roomsAmount < 1)
             {
                 throw new ArgumentOutOfRangeException($"{nameof(roomsAmount)} must be greater than zero.");
             }
 
-           
+
             for (int i = 0; i < roomsAmount; i++)
             {
-                AddRoom(minBlocks, maxBlocks);
+                AddRoom(minBlocks, maxBlocks, sideState);
             }
         }
 
@@ -255,7 +255,7 @@ namespace Samana.Generators
             public SideState State;
             public readonly Vector2 Direction;
 
-            public Side(RoomBlock parentRoomBlock, Vector2 direction, SideState state = SideState.Side)
+            public Side(RoomBlock parentRoomBlock, Vector2 direction, SideState state = SideState.Wall)
             {
                 ParentRoomBlock = parentRoomBlock;
                 Direction = direction;
@@ -313,7 +313,7 @@ namespace Samana.Generators
     public enum SideState : int
     {
         None = 0,
-        Side = 1,
+        Wall = 1,
         Door = 2,
     }
 
