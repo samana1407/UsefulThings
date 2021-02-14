@@ -23,20 +23,20 @@ namespace Samana.Generators
             _map.Clear();
         }
 
-        public void AddRoom(int minBlocks = 1, int maxBlocks = 1, SideState sideState = SideState.Door)
+        public void AddSolidRoom(int minBlocksCount = 1, int maxBlocksCount = 1)
         {
-            if (minBlocks < 1 || maxBlocks < 1)
+            if (minBlocksCount < 1 || maxBlocksCount < 1)
             {
-                throw new ArgumentOutOfRangeException($"{nameof(minBlocks)} or {nameof(maxBlocks)} must be greater than zero.");
+                throw new ArgumentOutOfRangeException($"{nameof(minBlocksCount)} or {nameof(maxBlocksCount)} must be greater than zero.");
             }
 
-            if (minBlocks > maxBlocks)
+            if (minBlocksCount > maxBlocksCount)
             {
-                throw new ArgumentOutOfRangeException($"{nameof(minBlocks)} cannot be greater than {nameof(maxBlocks)}.");
+                throw new ArgumentOutOfRangeException($"{nameof(minBlocksCount)} cannot be greater than {nameof(maxBlocksCount)}.");
             }
 
 
-            int targetBlocksCount = _rand.Next(minBlocks, maxBlocks + 1);
+            int targetBlocksCount = _rand.Next(minBlocksCount, maxBlocksCount + 1);
 
             Room room = new Room();
 
@@ -59,24 +59,29 @@ namespace Samana.Generators
                 if (!succes) continue;
 
                 // если дошли сюда, значит комната вместилась и нужно сделать двери в первом блоке и начальной стене
-                connectedSide.State = sideState;
-                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = sideState;
+                connectedSide.State = SideState.Door;
+                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = SideState.Door;
                 return;
             }
         }
 
-        public void AddRooms(int roomsAmount = 1, int minBlocks = 1, int maxBlocks = 1, SideState sideState = SideState.Door)
+        public void AddSolidRooms(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1)
         {
-            if (roomsAmount < 1)
+            if (roomsCount < 1)
             {
-                throw new ArgumentOutOfRangeException($"{nameof(roomsAmount)} must be greater than zero.");
+                throw new ArgumentOutOfRangeException($"{nameof(roomsCount)} must be greater than zero.");
             }
 
 
-            for (int i = 0; i < roomsAmount; i++)
+            for (int i = 0; i < roomsCount; i++)
             {
-                AddRoom(minBlocks, maxBlocks, sideState);
+                AddSolidRoom(minBlocksCount, maxBlocksCount);
             }
+        }
+
+        public void AddRoomWithPartitions(int minBlocksCount = 1, int maxBlocksCount = 1)
+        {
+
         }
 
         public List<RoomData> GetRoomsData()
