@@ -12,7 +12,7 @@ namespace Samana.Generators
         private Dictionary<Vector2, RoomBlock> _map;
 
 
-        #region PUBLIC
+        #region PUBLIC METHODS
         public RoomsGenerator()
         {
             _map = new Dictionary<Vector2, RoomBlock>();
@@ -25,55 +25,8 @@ namespace Samana.Generators
 
         public void AddSolidRoom(int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
         {
-            if (minBlocksCount < 1 || maxBlocksCount < 1)
-            {
-                throw new ArgumentOutOfRangeException($"{nameof(minBlocksCount)} or {nameof(maxBlocksCount)} must be greater than zero.");
-            }
-
-            if (minBlocksCount > maxBlocksCount)
-            {
-                throw new ArgumentOutOfRangeException($"{nameof(minBlocksCount)} cannot be greater than {nameof(maxBlocksCount)}.");
-            }
-
-
-            int targetBlocksCount = _rand.Next(minBlocksCount, maxBlocksCount + 1);
-
-            Room room = new Room();
-
-            // первая комната без дверей создаётся с нулевых координат
-            if (_map.Count == 0)
-            {
-                tryConstructRoom(room, targetBlocksCount, 0, 0);
-                //setInnerSidesTo(room, SideState.None);
-
-                constructPartitionWalls(room);
-                return;
-            }
-
-            var allFreeSides = getFreeSidesOnMap().OrderBy(w => _rand.Next()).ToArray();
-
-            // выстраиваем комнату возле свободной стены, если комната не помещается, то пробуем с другой стены пока не получится
-            for (int i = 0; i < allFreeSides.Length; i++)
-            {
-                Side connectedSide = allFreeSides[i];
-                Vector2 firstPosition = connectedSide.ToPosition();
-
-                // если комнату неудалось полностью уместить в данном месте, то пробуем с другого места. 
-                bool succes = tryConstructRoom(room, targetBlocksCount, firstPosition.X, firstPosition.Y);
-                if (!succes) continue;
-
-                //убрать все смежные стены внутри комнаты
-                //removeInsideWalls(room);
-                constructPartitionWalls(room);
-                //setInnerSidesTo(room, SideState.None);
-
-
-                // если дошли сюда, значит комната вместилась и нужно сделать двери в первом блоке и начальной стене
-                connectedSide.State = connectedState;
-                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = connectedState;
-
-                return;
-            }
+            Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount, connectedState);
+            setInnerSidesTo(newRoom, SideState.None);
         }
 
         public void AddSolidRooms(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
@@ -90,9 +43,26 @@ namespace Samana.Generators
             }
         }
 
-        public void AddRoomWithPartitions(int minBlocksCount = 1, int maxBlocksCount = 1)
+        public void AddRoomWithPartitions(int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
         {
-            throw new NotImplementedException();
+            Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount, connectedState);
+            setInnerSidesTo(newRoom, SideState.Wall);
+            constructPartitionWalls(newRoom);
+        }
+
+        public void AddRoomsWithPartitions(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
+        {
+            if (roomsCount < 1)
+            {
+                throw new ArgumentOutOfRangeException($"{nameof(roomsCount)} must be greater than zero.");
+            }
+
+            for (int i = 0; i < roomsCount; i++)
+            {
+                Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount, connectedState);
+                setInnerSidesTo(newRoom, SideState.Wall);
+                constructPartitionWalls(newRoom);
+            }
         }
 
         public List<RoomData> GetRoomsData()
@@ -127,58 +97,7 @@ namespace Samana.Generators
 
         #endregion
 
-
-        private bool tryConstructRoom(Room room, int targetBlocksCount, int firstBlockX, int firstBlockY)
-        {
-            // добавили первый блок
-            createAndAddBlockToRoomAndMap(firstBlockX, firstBlockY, room);
-
-            // добавляем остальные блоки в комнату
-            for (int i = 1; i < targetBlocksCount; i++)
-            {
-                // берём все сводобные стены у комнаты
-                Side[] freeSidesOnRoom = getFreeSidesOnRoom(room);
-
-                // если свободных стен нет, значит комнату невозможно достроить
-                // и нужно отчистить её и вернуть результат о неудаче
-                if (freeSidesOnRoom.Length == 0)
-                {
-                    //Console.WriteLine("no free side on room");
-                    //отчистить комнату и начать с другой стены на карте
-                    foreach (RoomBlock roomBlock in room.Blocks)
-                    {
-                        _map.Remove(roomBlock.Position);
-                    }
-                    room.Blocks.Clear();
-
-                    return false;
-                }
-
-                // создание нового блока комнаты возле случайной свободной стены у комнаты
-                Side randSide = freeSidesOnRoom[_rand.Next(freeSidesOnRoom.Length)];
-                Vector2 blockPos = randSide.ToPosition();
-                RoomBlock newBlock = createAndAddBlockToRoomAndMap(blockPos.X, blockPos.Y, room);
-            }
-
-            return true;
-        }
-
-        private void clampPositions()
-        {
-            if (_map.Count == 0) return;
-
-            int minX = _map.Keys.Min(p => p.X);
-            int minY = _map.Keys.Min(p => p.Y);
-
-            foreach (var rb in _map.Values)
-            {
-                rb.Position = new Vector2(rb.Position.X - minX, rb.Position.Y - minY);
-            }
-
-            var tempMap = new Dictionary<Vector2, RoomBlock>();
-            _map = _map.Values.ToDictionary(b => b.Position, b => b);
-        }
-
+        #region PRIVATE METHODS
         private RoomBlock createAndAddBlockToRoomAndMap(int x, int y, Room room)
         {
             RoomBlock newBlock = new RoomBlock(x, y, room);
@@ -222,21 +141,34 @@ namespace Samana.Generators
             }
         }
 
-        // возвращает соседние блоки в пределах общей комнаты
-        private List<RoomBlock> getNeighboursBlocks(RoomBlock block, Room room)
+
+        private Side[] getFreeSidesOnMap()
         {
-            var neighbours = new List<RoomBlock>();
-
-            for (int i = 0; i < block.Sides.Length; i++)
-            {
-                Vector2 toPosition = block.Sides[i].ToPosition();
-                var neighbour = room.Blocks.FirstOrDefault(b => b.Position == toPosition);
-                if (neighbour != null) neighbours.Add(neighbour);
-            }
-
-            return neighbours;
+            var allFreeSides = _map.Values.SelectMany(rb => rb.Sides)
+                                        .Where(side => !_map.ContainsKey(side.ToPosition())).ToArray();
+            return allFreeSides;
+        }
+        private Side[] getFreeSidesOnRoom(Room room)
+        {
+            var allFreeSides = room.Blocks.SelectMany(rb => rb.Sides)
+                                        .Where(side => !_map.ContainsKey(side.ToPosition())).ToArray();
+            return allFreeSides;
         }
 
+
+        private Side[] getOuterSidesOnRoom(Room room)
+        {
+            var roomBlocksPositions = room.Blocks.Select(b => b.Position).ToList();
+
+            return room.Blocks.SelectMany(rb => rb.Sides)
+                            .Where(s => !roomBlocksPositions.Contains(s.ToPosition())).ToArray();
+        }
+        private Side[] getInnerSidesOnRoom(Room room)
+        {
+            var allSides = room.Blocks.SelectMany(b => b.Sides).ToArray();
+
+            return allSides.Except(getOuterSidesOnRoom(room)).ToArray();
+        }
         private void setInnerSidesTo(Room room, SideState targetState = SideState.None)
         {
 
@@ -246,36 +178,6 @@ namespace Samana.Generators
             }
         }
 
-        private Side[] getFreeSidesOnMap()
-        {
-            var allFreeSides = _map.Values.SelectMany(rb => rb.Sides)
-                                        .Where(side => !_map.ContainsKey(side.ToPosition())).ToArray();
-            return allFreeSides;
-        }
-
-
-
-        private Side[] getFreeSidesOnRoom(Room room)
-        {
-            var allFreeSides = room.Blocks.SelectMany(rb => rb.Sides)
-                                        .Where(side => !_map.ContainsKey(side.ToPosition())).ToArray();
-            return allFreeSides;
-        }
-
-        private Side[] getOuterSidesOnRoom(Room room)
-        {
-            var roomBlocksPositions = room.Blocks.Select(b => b.Position).ToList();
-
-            return room.Blocks.SelectMany(rb => rb.Sides)
-                            .Where(s => !roomBlocksPositions.Contains(s.ToPosition())).ToArray();
-        }
-
-        private Side[] getInnerSidesOnRoom(Room room)
-        {
-            var allSides = room.Blocks.SelectMany(b => b.Sides).ToArray();
-
-            return allSides.Except(getOuterSidesOnRoom(room)).ToArray();
-        }
 
 
         // создаёт базовую комнату из блоков. 
@@ -325,7 +227,59 @@ namespace Samana.Generators
 
             return room;
         }
+        private bool tryConstructRoom(Room room, int targetBlocksCount, int firstBlockX, int firstBlockY)
+        {
+            // добавили первый блок
+            createAndAddBlockToRoomAndMap(firstBlockX, firstBlockY, room);
 
+            // добавляем остальные блоки в комнату
+            for (int i = 1; i < targetBlocksCount; i++)
+            {
+                // берём все сводобные стены у комнаты
+                Side[] freeSidesOnRoom = getFreeSidesOnRoom(room);
+
+                // если свободных стен нет, значит комнату невозможно достроить
+                // и нужно отчистить её и вернуть результат о неудаче
+                if (freeSidesOnRoom.Length == 0)
+                {
+                    //Console.WriteLine("no free side on room");
+                    //отчистить комнату и начать с другой стены на карте
+                    foreach (RoomBlock roomBlock in room.Blocks)
+                    {
+                        _map.Remove(roomBlock.Position);
+                    }
+                    room.Blocks.Clear();
+
+                    return false;
+                }
+
+                // создание нового блока комнаты возле случайной свободной стены у комнаты
+                Side randSide = freeSidesOnRoom[_rand.Next(freeSidesOnRoom.Length)];
+                Vector2 blockPos = randSide.ToPosition();
+                RoomBlock newBlock = createAndAddBlockToRoomAndMap(blockPos.X, blockPos.Y, room);
+            }
+
+            return true;
+        }
+        private void clampPositions()
+        {
+            if (_map.Count == 0) return;
+
+            int minX = _map.Keys.Min(p => p.X);
+            int minY = _map.Keys.Min(p => p.Y);
+
+            foreach (var rb in _map.Values)
+            {
+                rb.Position = new Vector2(rb.Position.X - minX, rb.Position.Y - minY);
+            }
+
+            var tempMap = new Dictionary<Vector2, RoomBlock>();
+            _map = _map.Values.ToDictionary(b => b.Position, b => b);
+        }
+
+        #endregion
+
+        #region PRIVATE CLASSES
 
         private class Room
         {
@@ -434,6 +388,11 @@ namespace Samana.Generators
         }
     }
 
+    #endregion
+
+
+
+    #region PUBLIC OUT CLASSES
     public enum SideState : int
     {
         None = 0,
@@ -460,5 +419,5 @@ namespace Samana.Generators
         public SideState DownSide;
         public SideState LeftSide;
     }
-
+    #endregion
 }
