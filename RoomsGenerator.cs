@@ -23,7 +23,7 @@ namespace Samana.Generators
             _map.Clear();
         }
 
-        public void AddSolidRoom(int minBlocksCount = 1, int maxBlocksCount = 1)
+        public void AddSolidRoom(int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
         {
             if (minBlocksCount < 1 || maxBlocksCount < 1)
             {
@@ -44,7 +44,9 @@ namespace Samana.Generators
             if (_map.Count == 0)
             {
                 tryConstructRoom(room, targetBlocksCount, 0, 0);
-                removeInsideWalls(room);
+                //setInnerSidesTo(room, SideState.None);
+
+                constructPartitionWalls(room);
                 return;
             }
 
@@ -60,17 +62,21 @@ namespace Samana.Generators
                 bool succes = tryConstructRoom(room, targetBlocksCount, firstPosition.X, firstPosition.Y);
                 if (!succes) continue;
 
+                //убрать все смежные стены внутри комнаты
+                //removeInsideWalls(room);
+                constructPartitionWalls(room);
+                //setInnerSidesTo(room, SideState.None);
+
+
                 // если дошли сюда, значит комната вместилась и нужно сделать двери в первом блоке и начальной стене
-                connectedSide.State = SideState.Door;
-                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = SideState.Door;
-                
-                // и убрать все смежные стены внутри комнаты
-                removeInsideWalls(room);
+                connectedSide.State = connectedState;
+                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = connectedState;
+
                 return;
             }
         }
 
-        public void AddSolidRooms(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1)
+        public void AddSolidRooms(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
         {
             if (roomsCount < 1)
             {
@@ -80,7 +86,7 @@ namespace Samana.Generators
 
             for (int i = 0; i < roomsCount; i++)
             {
-                AddSolidRoom(minBlocksCount, maxBlocksCount);
+                AddSolidRoom(minBlocksCount, maxBlocksCount, connectedState);
             }
         }
 
@@ -181,23 +187,62 @@ namespace Samana.Generators
 
             return newBlock;
         }
-      
-        private void removeInsideWalls(Room room)
+
+        // расставляет внутри комнаты случайные перегородки
+        private void constructPartitionWalls(Room room)
         {
-            for (int i = 0; i < room.Blocks.Count; i++)
+            setInnerSidesTo(room, SideState.Wall);
+
+            var shuffledBlocks = room.Blocks.OrderBy(_ => _rand.Next()).ToList();
+
+            var addedBlocks = new List<RoomBlock>();
+            addedBlocks.Add(shuffledBlocks[0]);
+
+
+            while (addedBlocks.Count != shuffledBlocks.Count)
             {
-                RoomBlock block = room.Blocks[i];
-                for (int j = 0; j < block.Sides.Length; j++)
+                var block = addedBlocks[_rand.Next(addedBlocks.Count)];
+
+                // найти все  соседние блоки этой же комнаты, исключая уже добавленные блоки
+                var shuffledSides = block.Sides.OrderBy(_ => _rand.Next()).ToArray();
+
+                for (int j = 0; j < shuffledSides.Length; j++)
                 {
-                    Side currentSide = block.Sides[j];
+                    Side currentSide = shuffledSides[j];
                     Vector2 neighbourPos = currentSide.ToPosition();
                     RoomBlock neighbourBlock = room.Blocks.FirstOrDefault(b => b.Position == neighbourPos);
-                    if (neighbourBlock != null)
+                    if (neighbourBlock != null && !addedBlocks.Contains(neighbourBlock))
                     {
                         currentSide.State = SideState.None;
                         neighbourBlock.GetSideByDirection(currentSide.Direction.GetOpposite()).State = SideState.None;
+                        addedBlocks.Add(neighbourBlock);
+                        break;
                     }
                 }
+            }
+        }
+
+        // возвращает соседние блоки в пределах общей комнаты
+        private List<RoomBlock> getNeighboursBlocks(RoomBlock block, Room room)
+        {
+            var neighbours = new List<RoomBlock>();
+
+            for (int i = 0; i < block.Sides.Length; i++)
+            {
+                Vector2 toPosition = block.Sides[i].ToPosition();
+                var neighbour = room.Blocks.FirstOrDefault(b => b.Position == toPosition);
+                if (neighbour != null) neighbours.Add(neighbour);
+            }
+
+            return neighbours;
+        }
+
+        private void setInnerSidesTo(Room room, SideState targetState = SideState.None)
+        {
+
+            foreach (Side side in getInnerSidesOnRoom(room))
+            {
+                side.State = targetState;
             }
         }
 
@@ -208,11 +253,77 @@ namespace Samana.Generators
             return allFreeSides;
         }
 
+
+
         private Side[] getFreeSidesOnRoom(Room room)
         {
             var allFreeSides = room.Blocks.SelectMany(rb => rb.Sides)
                                         .Where(side => !_map.ContainsKey(side.ToPosition())).ToArray();
             return allFreeSides;
+        }
+
+        private Side[] getOuterSidesOnRoom(Room room)
+        {
+            var roomBlocksPositions = room.Blocks.Select(b => b.Position).ToList();
+
+            return room.Blocks.SelectMany(rb => rb.Sides)
+                            .Where(s => !roomBlocksPositions.Contains(s.ToPosition())).ToArray();
+        }
+
+        private Side[] getInnerSidesOnRoom(Room room)
+        {
+            var allSides = room.Blocks.SelectMany(b => b.Sides).ToArray();
+
+            return allSides.Except(getOuterSidesOnRoom(room)).ToArray();
+        }
+
+
+        // создаёт базовую комнату из блоков. 
+        // все стороны блоков в состоянии по-умолчанию (стена)
+        // базовая комната автоматически соединяется дверью
+        private Room addBaseRoom(int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
+        {
+            if (minBlocksCount < 1 || maxBlocksCount < 1)
+            {
+                throw new ArgumentOutOfRangeException($"{nameof(minBlocksCount)} or {nameof(maxBlocksCount)} must be greater than zero.");
+            }
+
+            if (minBlocksCount > maxBlocksCount)
+            {
+                throw new ArgumentOutOfRangeException($"{nameof(minBlocksCount)} cannot be greater than {nameof(maxBlocksCount)}.");
+            }
+
+
+            int targetBlocksCount = _rand.Next(minBlocksCount, maxBlocksCount + 1);
+
+            Room room = new Room();
+
+            // первая комната без дверей создаётся с нулевых координат
+            if (_map.Count == 0)
+            {
+                tryConstructRoom(room, targetBlocksCount, 0, 0);
+                return room;
+            }
+
+            var allFreeSides = getFreeSidesOnMap().OrderBy(w => _rand.Next()).ToArray();
+
+            // выстраиваем комнату возле свободной стены, если комната не помещается, то пробуем с другой стены пока не получится
+            for (int i = 0; i < allFreeSides.Length; i++)
+            {
+                Side connectedSide = allFreeSides[i];
+                Vector2 firstPosition = connectedSide.ToPosition();
+
+                // если комнату неудалось полностью уместить в данном месте, то пробуем с другого места. 
+                bool succes = tryConstructRoom(room, targetBlocksCount, firstPosition.X, firstPosition.Y);
+                if (!succes) continue;
+
+                // если дошли сюда, значит комната вместилась и нужно сделать двери в первом блоке и начальной стене
+                connectedSide.State = connectedState;
+                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = connectedState;
+                break;
+            }
+
+            return room;
         }
 
 
