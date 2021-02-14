@@ -43,7 +43,8 @@ namespace Samana.Generators
             // первая комната без дверей создаётся с нулевых координат
             if (_map.Count == 0)
             {
-                tryFillRoom(room, targetBlocksCount, 0, 0);
+                tryConstructRoom(room, targetBlocksCount, 0, 0);
+                removeInsideWalls(room);
                 return;
             }
 
@@ -55,12 +56,16 @@ namespace Samana.Generators
                 Side connectedSide = allFreeSides[i];
                 Vector2 firstPosition = connectedSide.ToPosition();
 
-                bool succes = tryFillRoom(room, targetBlocksCount, firstPosition.X, firstPosition.Y);
+                // если комнату неудалось полностью уместить в данном месте, то пробуем с другого места. 
+                bool succes = tryConstructRoom(room, targetBlocksCount, firstPosition.X, firstPosition.Y);
                 if (!succes) continue;
 
                 // если дошли сюда, значит комната вместилась и нужно сделать двери в первом блоке и начальной стене
                 connectedSide.State = SideState.Door;
                 room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = SideState.Door;
+                
+                // и убрать все смежные стены внутри комнаты
+                removeInsideWalls(room);
                 return;
             }
         }
@@ -81,7 +86,7 @@ namespace Samana.Generators
 
         public void AddRoomWithPartitions(int minBlocksCount = 1, int maxBlocksCount = 1)
         {
-
+            throw new NotImplementedException();
         }
 
         public List<RoomData> GetRoomsData()
@@ -117,7 +122,7 @@ namespace Samana.Generators
         #endregion
 
 
-        private bool tryFillRoom(Room room, int targetBlocksCount, int firstBlockX, int firstBlockY)
+        private bool tryConstructRoom(Room room, int targetBlocksCount, int firstBlockX, int firstBlockY)
         {
             // добавили первый блок
             createAndAddBlockToRoomAndMap(firstBlockX, firstBlockY, room);
@@ -128,7 +133,8 @@ namespace Samana.Generators
                 // берём все сводобные стены у комнаты
                 Side[] freeSidesOnRoom = getFreeSidesOnRoom(room);
 
-                // если свободных стен нет, значит комнату невозможно достроить и нужно отчистить её и начать с другого места
+                // если свободных стен нет, значит комнату невозможно достроить
+                // и нужно отчистить её и вернуть результат о неудаче
                 if (freeSidesOnRoom.Length == 0)
                 {
                     //Console.WriteLine("no free side on room");
@@ -146,8 +152,6 @@ namespace Samana.Generators
                 Side randSide = freeSidesOnRoom[_rand.Next(freeSidesOnRoom.Length)];
                 Vector2 blockPos = randSide.ToPosition();
                 RoomBlock newBlock = createAndAddBlockToRoomAndMap(blockPos.X, blockPos.Y, room);
-
-                mergeSides(newBlock, room);
             }
 
             return true;
@@ -177,19 +181,23 @@ namespace Samana.Generators
 
             return newBlock;
         }
-
-        private void mergeSides(RoomBlock newBlock, Room room)
+      
+        private void removeInsideWalls(Room room)
         {
-            for (int i = 0; i < newBlock.Sides.Length; i++)
+            for (int i = 0; i < room.Blocks.Count; i++)
             {
-                var nearBlock = room.Blocks.FirstOrDefault(b => b.Position == newBlock.Sides[i].ToPosition());
-                if (nearBlock != null)
+                RoomBlock block = room.Blocks[i];
+                for (int j = 0; j < block.Sides.Length; j++)
                 {
-                    newBlock.Sides[i].State = SideState.None;
-                    Vector2 oppositeDirection = newBlock.Sides[i].Direction.GetOpposite();
-                    nearBlock.GetSideByDirection(oppositeDirection).State = SideState.None;
+                    Side currentSide = block.Sides[j];
+                    Vector2 neighbourPos = currentSide.ToPosition();
+                    RoomBlock neighbourBlock = room.Blocks.FirstOrDefault(b => b.Position == neighbourPos);
+                    if (neighbourBlock != null)
+                    {
+                        currentSide.State = SideState.None;
+                        neighbourBlock.GetSideByDirection(currentSide.Direction.GetOpposite()).State = SideState.None;
+                    }
                 }
-
             }
         }
 
