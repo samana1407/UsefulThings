@@ -23,13 +23,13 @@ namespace Samana.Generators
             _map.Clear();
         }
 
-        public void AddSolidRoom(int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
+        public void AddSolidRoom(int minBlocksCount = 1, int maxBlocksCount = 1)
         {
-            Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount, connectedState);
+            Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
             setInnerSidesTo(newRoom, SideState.None);
         }
 
-        public void AddSolidRooms(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
+        public void AddSolidRooms(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             if (roomsCount < 1)
             {
@@ -39,18 +39,18 @@ namespace Samana.Generators
 
             for (int i = 0; i < roomsCount; i++)
             {
-                AddSolidRoom(minBlocksCount, maxBlocksCount, connectedState);
+                AddSolidRoom(minBlocksCount, maxBlocksCount);
             }
         }
 
-        public void AddRoomWithPartitions(int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
+        public void AddRoomWithPartitions(int minBlocksCount = 1, int maxBlocksCount = 1)
         {
-            Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount, connectedState);
+            Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
             setInnerSidesTo(newRoom, SideState.Wall);
             constructPartitionWalls(newRoom);
         }
 
-        public void AddRoomsWithPartitions(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
+        public void AddRoomsWithPartitions(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             if (roomsCount < 1)
             {
@@ -59,7 +59,7 @@ namespace Samana.Generators
 
             for (int i = 0; i < roomsCount; i++)
             {
-                Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount, connectedState);
+                Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
                 setInnerSidesTo(newRoom, SideState.Wall);
                 constructPartitionWalls(newRoom);
             }
@@ -189,7 +189,7 @@ namespace Samana.Generators
         // создаёт базовую комнату из блоков. 
         // все стороны блоков в состоянии по-умолчанию (стена)
         // базовая комната автоматически соединяется дверью
-        private Room addBaseRoom(int minBlocksCount = 1, int maxBlocksCount = 1, SideState connectedState = SideState.Door)
+        private Room addBaseRoom(int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             if (minBlocksCount < 1 || maxBlocksCount < 1)
             {
@@ -226,14 +226,12 @@ namespace Samana.Generators
                 if (!succes) continue;
 
                 // если дошли сюда, значит комната вместилась и нужно сделать двери в первом блоке и начальной стене
-                connectedSide.State = connectedState;
-                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = connectedState;
+                connectedSide.State = SideState.Door;
+                room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = SideState.Door;
 
                 // установить соседство соединённым комнатам, если их соединение не является стеной
-                if (connectedState != SideState.Wall)
-                {
-                    defineHeighbourhood(room, connectedSide.ParentRoomBlock.ParentRoom);
-                }
+                defineDoorHeighbourhood(room, connectedSide.ParentRoomBlock.ParentRoom);
+
                 break;
             }
 
@@ -290,10 +288,10 @@ namespace Samana.Generators
         }
 
         // установить соседство (сосед это та комната с которой есть соединение дверью)
-        private void defineHeighbourhood(Room roomA, Room roomB)
+        private void defineDoorHeighbourhood(Room roomA, Room roomB)
         {
-            if (!roomA.Neighbours.Contains(roomB)) roomA.Neighbours.Add(roomB);
-            if (!roomB.Neighbours.Contains(roomA)) roomB.Neighbours.Add(roomA);
+            if (!roomA.DoorNeighbours.Contains(roomB)) roomA.DoorNeighbours.Add(roomB);
+            if (!roomB.DoorNeighbours.Contains(roomA)) roomB.DoorNeighbours.Add(roomA);
         }
         #endregion
 
@@ -301,10 +299,7 @@ namespace Samana.Generators
 
         public class Room
         {
-            private static int _id;
-            public readonly int Id;
-
-            public List<Room> Neighbours;
+            public List<Room> DoorNeighbours;
             public List<RoomBlock> Blocks;
             public int GetDoorsCount
             {
@@ -316,9 +311,8 @@ namespace Samana.Generators
             }
             public Room()
             {
-                Id = _id++;
                 Blocks = new List<RoomBlock>();
-                Neighbours = new List<Room>();
+                DoorNeighbours = new List<Room>();
             }
         }
 
@@ -327,13 +321,16 @@ namespace Samana.Generators
         {
             public Vector2 Position;
             public Room ParentRoom;
-            public Side[] Sides;
+            public readonly Side[] Sides;
 
             //public Side UpSide => get Sides[0];
             public Side UpSide { get => Sides[0]; }
             public Side RightSide { get => Sides[1]; }
             public Side DownSide { get => Sides[2]; }
             public Side LeftSide { get => Sides[3]; }
+
+            public int X { get => Position.X; set => Position.X = value; }
+            public int Y { get => Position.Y; set => Position.Y = value; }
 
             public RoomBlock(int x, int y, Room parentRoom)
             {
