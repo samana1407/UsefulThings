@@ -95,6 +95,12 @@ namespace Samana.Generators
             return outRoomsData;
         }
 
+        public List<Room> GetRawRoomsData()
+        {
+            clampPositions();
+            return _map.Values.Select(b => b.ParentRoom).Distinct().ToList();
+        }
+
         #endregion
 
         #region PRIVATE METHODS
@@ -222,6 +228,12 @@ namespace Samana.Generators
                 // если дошли сюда, значит комната вместилась и нужно сделать двери в первом блоке и начальной стене
                 connectedSide.State = connectedState;
                 room.Blocks[0].GetSideByDirection(connectedSide.Direction.GetOpposite()).State = connectedState;
+
+                // установить соседство соединённым комнатам, если их соединение не является стеной
+                if (connectedState != SideState.Wall)
+                {
+                    defineHeighbourhood(room, connectedSide.ParentRoomBlock.ParentRoom);
+                }
                 break;
             }
 
@@ -277,12 +289,23 @@ namespace Samana.Generators
             _map = _map.Values.ToDictionary(b => b.Position, b => b);
         }
 
+        // установить соседство (сосед это та комната с которой есть соединение дверью)
+        private void defineHeighbourhood(Room roomA, Room roomB)
+        {
+            if (!roomA.Neighbours.Contains(roomB)) roomA.Neighbours.Add(roomB);
+            if (!roomB.Neighbours.Contains(roomA)) roomB.Neighbours.Add(roomA);
+        }
         #endregion
 
         #region PRIVATE CLASSES
 
-        private class Room
+        public class Room
         {
+            private static int _id;
+            public readonly int Id;
+
+            public List<Room> Neighbours;
+            public List<RoomBlock> Blocks;
             public int GetDoorsCount
             {
                 get
@@ -291,16 +314,26 @@ namespace Samana.Generators
                     return Blocks.SelectMany(b => b.Sides).Where(w => w.State == SideState.Door).Count();
                 }
             }
-
-            public List<RoomBlock> Blocks = new List<RoomBlock>();
+            public Room()
+            {
+                Id = _id++;
+                Blocks = new List<RoomBlock>();
+                Neighbours = new List<Room>();
+            }
         }
 
 
-        private class RoomBlock
+        public class RoomBlock
         {
             public Vector2 Position;
             public Room ParentRoom;
             public Side[] Sides;
+
+            //public Side UpSide => get Sides[0];
+            public Side UpSide { get => Sides[0]; }
+            public Side RightSide { get => Sides[1]; }
+            public Side DownSide { get => Sides[2]; }
+            public Side LeftSide { get => Sides[3]; }
 
             public RoomBlock(int x, int y, Room parentRoom)
             {
@@ -327,7 +360,7 @@ namespace Samana.Generators
 
         }
 
-        private class Side
+        public class Side
         {
             public RoomBlock ParentRoomBlock;
             public SideState State;
@@ -344,7 +377,7 @@ namespace Samana.Generators
             public Vector2 ToPosition() => ParentRoomBlock.Position + Direction;
         }
 
-        private struct Vector2
+        public struct Vector2
         {
             public readonly static Vector2 UP = new Vector2(0, -1);
             public readonly static Vector2 DOWN = new Vector2(0, 1);
@@ -386,10 +419,10 @@ namespace Samana.Generators
             }
 
         }
+
+        #endregion
+
     }
-
-    #endregion
-
 
 
     #region PUBLIC OUT CLASSES
