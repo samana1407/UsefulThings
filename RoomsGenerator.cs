@@ -49,7 +49,6 @@ namespace Samana.Generators
             setInnerSidesTo(newRoom, SideState.Wall);
             constructPartitionWalls(newRoom);
         }
-
         public void AddRoomsWithPartitions(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             if (roomsCount < 1)
@@ -62,6 +61,28 @@ namespace Samana.Generators
                 Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
                 setInnerSidesTo(newRoom, SideState.Wall);
                 constructPartitionWalls(newRoom);
+            }
+        }
+
+        public void AddRoomAsMaze(int minBlocksCount = 1, int maxBlocksCount = 1)
+        {
+            Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
+            setInnerSidesTo(newRoom, SideState.Wall);
+            constructPartitionWallsAsMaze(newRoom);
+        }
+
+        public void AddRoomsAsMaze(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1)
+        {
+            if (roomsCount < 1)
+            {
+                throw new ArgumentOutOfRangeException($"{nameof(roomsCount)} must be greater than zero.");
+            }
+
+            for (int i = 0; i < roomsCount; i++)
+            {
+                Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
+                setInnerSidesTo(newRoom, SideState.Wall);
+                constructPartitionWallsAsMaze(newRoom);
             }
         }
 
@@ -118,13 +139,13 @@ namespace Samana.Generators
         {
             setInnerSidesTo(room, SideState.Wall);
 
-            var shuffledBlocks = room.Blocks.OrderBy(_ => _rand.Next()).ToList();
+            var randFirstBlock = room.Blocks[_rand.Next(room.Blocks.Count)];
 
             var addedBlocks = new List<RoomBlock>();
-            addedBlocks.Add(shuffledBlocks[0]);
+            addedBlocks.Add(randFirstBlock);
 
 
-            while (addedBlocks.Count != shuffledBlocks.Count)
+            while (addedBlocks.Count < room.Blocks.Count)
             {
                 var block = addedBlocks[_rand.Next(addedBlocks.Count)];
 
@@ -144,6 +165,52 @@ namespace Samana.Generators
                         break;
                     }
                 }
+            }
+        }
+
+        private void constructPartitionWallsAsMaze(Room room)
+        {
+            setInnerSidesTo(room, SideState.Wall);
+
+
+            var randFirstBlock = room.Blocks[_rand.Next(room.Blocks.Count)];
+
+            Stack<RoomBlock> path = new Stack<RoomBlock>();
+            path.Push(randFirstBlock);
+
+            Dictionary<RoomBlock, bool> visitedMap = room.Blocks.ToDictionary(b => b, v => false);
+            visitedMap[randFirstBlock] = true;
+
+
+            while (visitedMap.Values.Contains(false))
+            {
+                var block = path.Peek();
+                var shuffledSides = block.Sides.OrderBy(_ => _rand.Next()).ToArray();
+
+                bool finded = false;
+                for (int j = 0; j < shuffledSides.Length; j++)
+                {
+                    Side currentSide = shuffledSides[j];
+                    Vector2 neighbourPos = currentSide.ToPosition();
+                    RoomBlock neighbourBlock = room.Blocks.FirstOrDefault(b => b.Position == neighbourPos);
+                    if (neighbourBlock != null && visitedMap[neighbourBlock] == false)
+                    {
+                        visitedMap[neighbourBlock] = true;
+                        path.Push(neighbourBlock);
+
+                        currentSide.State = SideState.None;
+                        neighbourBlock.GetSideByDirection(currentSide.Direction.GetOpposite()).State = SideState.None;
+
+                        finded = true;
+                        break;
+                    }
+                }
+
+                if (finded == false)
+                {
+                    path.Pop();
+                }
+
             }
         }
 
