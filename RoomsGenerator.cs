@@ -23,12 +23,12 @@ namespace Samana.Generators
             _map.Clear();
         }
 
+        //---------------------------------------
         public void AddSolidRoom(int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
             setInnerSidesTo(newRoom, SideState.None);
         }
-
         public void AddSolidRooms(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             if (roomsCount < 1)
@@ -43,6 +43,7 @@ namespace Samana.Generators
             }
         }
 
+        //---------------------------------------
         public void AddRoomWithPartitions(int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
@@ -64,13 +65,14 @@ namespace Samana.Generators
             }
         }
 
+        //---------------------------------------
+
         public void AddRoomAsMaze(int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
             setInnerSidesTo(newRoom, SideState.Wall);
             constructPartitionWallsAsMaze(newRoom);
         }
-
         public void AddRoomsAsMaze(int roomsCount = 1, int minBlocksCount = 1, int maxBlocksCount = 1)
         {
             if (roomsCount < 1)
@@ -86,35 +88,7 @@ namespace Samana.Generators
             }
         }
 
-        public List<RoomData> GetRoomsData()
-        {
-            clampPositions();
-            List<Room> rooms = _map.Values.Select(rb => rb.ParentRoom).Distinct().ToList();
-
-
-            List<RoomData> outRoomsData = new List<RoomData>();
-
-            foreach (Room room in rooms)
-            {
-                RoomData roomData = new RoomData();
-                foreach (RoomBlock block in room.Blocks)
-                {
-                    BlockData blockData = new BlockData();
-                    blockData.X = block.Position.X;
-                    blockData.Y = block.Position.Y;
-                    blockData.UpSide = block.GetSideByDirection(Vector2.UP).State;
-                    blockData.RightSide = block.GetSideByDirection(Vector2.RIGHT).State;
-                    blockData.DownSide = block.GetSideByDirection(Vector2.DOWN).State;
-                    blockData.LeftSide = block.GetSideByDirection(Vector2.LEFT).State;
-
-                    roomData.Blocks.Add(blockData);
-                }
-
-                outRoomsData.Add(roomData);
-            }
-
-            return outRoomsData;
-        }
+        //---------------------------------------
 
         public List<Room> GetRawRoomsData()
         {
@@ -496,25 +470,6 @@ namespace Samana.Generators
         Wall = 1,
         Door = 2,
     }
-
-    public class RoomData
-    {
-        public List<BlockData> Blocks;
-
-        public RoomData()
-        {
-            Blocks = new List<BlockData>();
-        }
-    }
-
-    public class BlockData
-    {
-        public int X;
-        public int Y;
-        public SideState UpSide;
-        public SideState RightSide;
-        public SideState DownSide;
-        public SideState LeftSide;
-    }
+   
     #endregion
 }
