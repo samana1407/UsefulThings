@@ -59,9 +59,7 @@ namespace Samana.Generators
 
             for (int i = 0; i < roomsCount; i++)
             {
-                Room newRoom = addBaseRoom(minBlocksCount, maxBlocksCount);
-                setInnerSidesTo(newRoom, SideState.Wall);
-                constructPartitionWalls(newRoom);
+                AddRoomWithPartitions(minBlocksCount, maxBlocksCount);
             }
         }
 
@@ -470,6 +468,6 @@ namespace Samana.Generators
         Wall = 1,
         Door = 2,
     }
-   
+
     #endregion
 }
